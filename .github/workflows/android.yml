@@ -1,0 +1,51 @@
+
+name: Build NinDroid APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android components
+        run: |
+          sdkmanager "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "cmake;3.22.1" \
+            "ndk;27.2.12479018"
+
+      - name: Extract NinDroid project
+        run: |
+          mkdir source
+          unzip -q NinDroid-Android-Studio-Project.zip -d source
+          find source -name settings.gradle.kts
+
+      - name: Build APK
+        run: |
+          PROJECT_DIR=$(dirname "$(find source -name settings.gradle.kts -print -quit)")
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NinDroid-debug-APK
+          path: source/**/build/outputs/apk/debug/*.apk
+          
