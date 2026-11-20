@@ -1,51 +1,58 @@
 
+
 name: Build NinDroid APK
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/android.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android components
+      - name: Install SDK components
         run: |
           sdkmanager "platforms;android-35" \
             "build-tools;35.0.0" \
-            "cmake;3.22.1" \
-            "ndk;27.2.12479018"
+            "cmake;3.22.1"
 
-      - name: Extract NinDroid project
+      - name: Extract project
         run: |
-          mkdir source
-          unzip -q NinDroid-Android-Studio-Project.zip -d source
-          find source -name settings.gradle.kts
+          mkdir -p source
+          unzip -o NinDroid-Android-Studio-Project.zip -d source
 
-      - name: Build APK
+      - name: Locate Gradle project
+        id: project
         run: |
-          PROJECT_DIR=$(dirname "$(find source -name settings.gradle.kts -print -quit)")
-          cd "$PROJECT_DIR"
-          gradle --no-daemon assembleDebug
+          FILE=$(find source -name settings.gradle.kts -print -quit)
+          if [ -z "$FILE" ]; then
+            echo "Gradle project not found"
+            exit 1
+          fi
+          echo "dir=$(dirname "$FILE")" >> "$GITHUB_OUTPUT"
+
+      - name: Build debug APK
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NinDroid-debug-APK
           path: source/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
           
